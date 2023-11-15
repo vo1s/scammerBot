@@ -6,7 +6,7 @@ from aiogram.types import (
     ReplyKeyboardRemove
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
+from config import config
 remove_keyboard = ReplyKeyboardRemove()
 
 main_keyboard = ReplyKeyboardMarkup(keyboard=[
@@ -49,3 +49,34 @@ not_scammer_inline_keyboard.button(
     text="Главное меню", callback_data="main_menu"
 )
 not_scammer_inline_keyboard.adjust(1)
+
+
+sub_channel = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Подписаться", url=config.channel_link.get_secret_value())
+        ]
+    ]
+)
+
+admin_keyboard_to_delete = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Удалить из базы", callback_data="delete_scammer_from_db")
+        ],
+        [
+            InlineKeyboardButton(text="Написать пользователю", callback_data="write_to_reporter")
+        ]
+    ]
+)
+
+admin_keyboard_to_add = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Добавить в базу", callback_data="add_scammer_to_db"),
+        ],
+        [
+            InlineKeyboardButton(text="Написать пользователю", callback_data="write_to_reporter")
+        ]
+    ]
+)

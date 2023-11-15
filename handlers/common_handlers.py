@@ -13,10 +13,10 @@ async def command_start_handler(message: types.Message, state: FSMContext) -> No
     This handler receives messages with `/start` command
     """
     await state.clear()
-    await message.answer(f"""✅Привет, данный бот поможет тебе проверить человека на скам! \n
+    await message.answer(f"""✅Привет, данный бот поможет тебе проверить человека на скам!
                         ⚡️Спасибо, что выбрали именно нашего бота для проверки скамеров""", reply_markup=keyboard.main_keyboard)
 
 
 @router.message()
 async def echo_handler(message: types.Message) -> None:
-    await message.answer("Выберите один из пунктов меню!")
+    await message.answer("Выберите один из пунктов меню!", reply_markup=keyboard.main_keyboard)
