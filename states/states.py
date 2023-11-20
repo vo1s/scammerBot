@@ -5,3 +5,4 @@ class Scammer(StatesGroup):
     scam_caption = State()
     scam_photo = State()
     scam_id = State()
+    resend_to_private = State()

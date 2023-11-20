@@ -28,13 +28,6 @@ private_channel_id = config.private_channel_id.get_secret_value()
 
 
 # хэндлер на кнопку "проверить"
-@router.message(F.text.lower() == "проверить")
-async def check_scammer1(message: types.Message, state: FSMContext):
-    await state.clear()
-    await message.answer(
-        f"Добавьте никнейм в формате {hunderline('@пользователь')} или перешлите сообщение от пользователя, чтобы проверить его в базе скамеров😊")
-    await state.set_state(Scammer.id)
-
 
 @router.message(Scammer.id)
 async def check_scammer2(message: types.Message, state: FSMContext):

@@ -1,3 +1,4 @@
+from aiogram.filters.callback_data import CallbackData
 from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
@@ -59,9 +60,10 @@ sub_channel = InlineKeyboardMarkup(
     ]
 )
 
-admin_keyboard_to_delete = InlineKeyboardMarkup(
+admin_keyboard_to_add_delete = InlineKeyboardMarkup(
     inline_keyboard=[
         [
+            InlineKeyboardButton(text="Добавить в базу", callback_data="add_scammer_to_db"),
             InlineKeyboardButton(text="Удалить из базы", callback_data="delete_scammer_from_db")
         ],
         [
@@ -70,13 +72,16 @@ admin_keyboard_to_delete = InlineKeyboardMarkup(
     ]
 )
 
-admin_keyboard_to_add = InlineKeyboardMarkup(
-    inline_keyboard=[
-        [
-            InlineKeyboardButton(text="Добавить в базу", callback_data="add_scammer_to_db"),
-        ],
-        [
-            InlineKeyboardButton(text="Написать пользователю", callback_data="write_to_reporter")
-        ]
-    ]
-)
+
+class Pagination(CallbackData, prefix="pag"):
+    action: str
+    page: int
+
+def paginator(page: int=0):
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="⬅", callback_data=Pagination(action="prev", page=page).pack()),
+        InlineKeyboardButton(text="➡", callback_data=Pagination(action="next", page=page).pack()),
+        width=2
+    )
+    return builder.as_markup()
