@@ -12,21 +12,11 @@ async def db_start():
                    scam_caption TEXT,
                    photo_scam BLOB,
                    tg_victim_id INTEGER,
-                   tg_victim_nick TEXT
+                   tg_victim_nick TEXT,
+                   not_scammer INTEGER DEFAULT 0
                    );
                    ''')
 
-
-    cursor.execute('''CREATE TABLE IF NOT EXISTS notscammer(
-                   id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                   tg_scammer_id INTEGER,
-                   tg_scammer_nick TEXT,
-                   not_scam_caption TEXT,
-                   photo_not_scam BLOB,
-                   tg_declarator_id INTEGER,
-                   tg_declarator_nick TEXT
-                   );
-                   ''')
 
     cursor.execute('''
                        CREATE TABLE IF NOT EXISTS temp_storage
@@ -37,7 +27,8 @@ async def db_start():
                        scam_caption TEXT,
                        photo_scam BLOB,
                        tg_victim_id INTEGER,
-                       tg_victim_nick TEXT
+                       tg_victim_nick TEXT,
+                       not_scammer INTEGER DEFAULT 0
                        );
                        ''')
 

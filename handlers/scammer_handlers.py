@@ -30,14 +30,16 @@ async def back_to_menu(callback: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "add_scammer")
 async def back_to_menu(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.answer(f"Введите id пользователя")
+    await callback.message.answer(
+        f"Добавьте никнейм в формате {hunderline('@пользователь')} или перешлите сообщение от пользователя, чтобы добавить его в базу скамеров.")
     await state.set_state(Scammer.scam_id)
 
 @router.callback_query(F.data == "confirm_scammer")
 async def back_to_menu(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await callback.message.answer(f"Введите id пользователя")
-    await state.set_state(Scammer.scam_id)
+    id_to_display = await state.get_data()
+    await state.update_data(scam_id=id_to_display["id"])
+    await callback.message.answer(f"Опишите ситуацию, в которой вы столкнулись со скамером, и в чем был обман")
+    await state.set_state(Scammer.scam_caption)
 
 @router.callback_query(F.data == "delete_scammer_from_db")
 async def delete_scammer(callback: types.CallbackQuery, state: FSMContext):
@@ -61,19 +63,18 @@ async def delete_scammer(callback: types.CallbackQuery, state: FSMContext):
 @router.callback_query(keyboard.Pagination.filter(F.action.in_(["prev", "next"])))
 async def pagination_handler(callback: types.CallbackQuery, callback_data: keyboard.Pagination,  state: FSMContext):
     id_to_display = await state.get_data()
-    print(id_to_display["id"])
     db.cursor.execute("""SELECT scam_caption, photo_scam FROM scammer WHERE tg_scammer_id = ?""",
                       (id_to_display["id"],))
     rows = db.cursor.fetchall()
 
     page_num = int(callback_data.page)
-    page = page_num - 1 if page_num > 0 else 0
+    page = page_num - 1 if page_num > 0 else (len(rows)-1)
 
     if callback_data.action == "next":
-        page = page_num + 1 if page_num < (len(rows)-1) else page_num
+        page = page_num + 1 if page_num < (len(rows)-1) else 0
     photo = InputMediaPhoto(type="photo", media=rows[page][1], caption=rows[page][0])
     with suppress(TelegramBadRequest):
-        await callback.message.edit_media(photo, keyboard.paginator(page))
+        await callback.message.edit_media(media=photo, reply_markup=keyboard.paginator(page))
     await callback.answer()
 
 @router.callback_query(F.data == "display_info")
@@ -83,7 +84,8 @@ async def send_random_value(callback: types.CallbackQuery, state: FSMContext):
     db.cursor.execute("""SELECT scam_caption, photo_scam FROM scammer WHERE tg_scammer_id = ?""",
                       (id_to_display["id"],))
     rows = db.cursor.fetchall()
-    print(rows[0][1])
+    print(type(rows[0][1]))
 
-    await callback.message.answer_photo(InputFile(rows[0][1]), caption=rows[0][0], reply_markup=keyboard.paginator())
+    await callback.message.answer_photo(rows[0][1], caption=rows[0][0], reply_markup=keyboard.paginator())
+    await callback.answer()
 

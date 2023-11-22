@@ -72,6 +72,19 @@ admin_keyboard_to_add_delete = InlineKeyboardMarkup(
     ]
 )
 
+change_scammer_status = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Убрать статус скамера", callback_data="change_scammer_status"),
+        ],
+        [
+            InlineKeyboardButton(text="Написать пользователю", callback_data="write_to_reporter")
+        ]
+    ]
+)
+
+
+
 
 class Pagination(CallbackData, prefix="pag"):
     action: str

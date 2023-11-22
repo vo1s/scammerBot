@@ -2,6 +2,7 @@ from typing import List
 
 from aiogram.enums import ContentType
 from aiogram_media_group import MediaGroupFilter, media_group_handler
+from telethon.errors import UsernameInvalidError
 from telethon.sync import TelegramClient
 from aiogram import Router, F, types
 from aiogram.fsm.context import FSMContext
@@ -27,7 +28,7 @@ private_channel_id = config.private_channel_id.get_secret_value()
 
 
 
-# хэндлер на кнопку "проверить"
+# продолжение хэндлера на кнопку "проверить"
 
 @router.message(Scammer.id)
 async def check_scammer2(message: types.Message, state: FSMContext):
@@ -46,17 +47,20 @@ async def check_scammer2(message: types.Message, state: FSMContext):
                     user = await client.get_entity(mention_user)
                     user_id = user.id
                     #  проверяем по базе
-
                     db.cursor.execute(
-                        f"SELECT tg_scammer_id, tg_scammer_nick FROM scammer WHERE tg_scammer_id = ? AND tg_scammer_nick = ?",
+                        f"SELECT tg_scammer_id, tg_scammer_nick FROM scammer WHERE tg_scammer_id = ? OR tg_scammer_nick = ?",
                         (user_id, mention_user))
-                    scammer_exist = db.cursor.fetchone()
-                    print(scammer_exist)
-                    if scammer_exist:
-                        await message.answer(f"id данного пользователя: {user_id}",
-                                             reply_markup=keyboard.remove_keyboard)
-                        await message.answer("⚠️Пользователь СКАМЕР, будьте осторожны!⚠️",
-                                             reply_markup=keyboard.scammer_inline_keyboard.as_markup())
+                    scammer_exist = db.cursor.fetchall()
+                    db.cursor.execute(
+                        f"SELECT not_scammer FROM scammer WHERE (tg_scammer_id = ? OR tg_scammer_nick = ?) AND not_scammer = 0",
+                        (user_id, mention_user))
+                    ex_scammer = db.cursor.fetchall()
+                    if scammer_exist and ex_scammer:
+                        if ex_scammer[0][0] == 0:
+                            await message.answer(f"id данного пользователя: {user_id}",
+                                                 reply_markup=keyboard.remove_keyboard)
+                            await message.answer("⚠️Пользователь СКАМЕР, будьте осторожны!⚠️",
+                                                 reply_markup=keyboard.scammer_inline_keyboard.as_markup())
                     else:
                         await message.answer(f"id данного пользователя: {user_id}",
                                              reply_markup=keyboard.remove_keyboard)
@@ -64,17 +68,24 @@ async def check_scammer2(message: types.Message, state: FSMContext):
                                              reply_markup=keyboard.not_scammer_inline_keyboard.as_markup())
                     await state.update_data(id=user_id)
                     break
-
+                except UsernameInvalidError:
+                    await message.answer("Такого пользователя не существует! Попробуйте еще раз!")
                 except ValueError:
                     await message.answer("Такого пользователя не существует! Попробуйте еще раз!")
 
-    if message.forward_from.id:
+    if not mention_exists and message.forward_from:
         forward_exist = True
         db.cursor.execute(
             f"SELECT tg_scammer_id, tg_scammer_nick FROM scammer WHERE tg_scammer_id = ?",
             (message.forward_from.id,))
         scammer_exist = db.cursor.fetchone()
-        if scammer_exist:
+
+        db.cursor.execute(
+            f"SELECT not_scammer FROM scammer WHERE tg_scammer_id = ?",
+            (message.forward_from.id,))
+        ex_scammer = db.cursor.fetchall()
+
+        if scammer_exist and (ex_scammer[0][0] == 0):
             await message.answer(f"id данного пользователя: {message.forward_from.id}",
                                  reply_markup=keyboard.remove_keyboard)
             await message.answer("⚠️Пользователь СКАМЕР, будьте осторожны!⚠️",
