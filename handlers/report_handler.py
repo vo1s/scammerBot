@@ -4,6 +4,7 @@ import re
 from aiogram.enums import ContentType
 from aiogram.exceptions import TelegramBadRequest
 from aiogram_media_group import media_group_handler
+from telethon.errors import UsernameInvalidError
 from telethon.sync import TelegramClient
 from aiogram import Router, F, types
 from aiogram.fsm.context import FSMContext
@@ -30,18 +31,23 @@ async def create_scammer2(message: types.Message, state: FSMContext):
     entitys = message.entities or []
     mention_exists = False
     forward_exist = False
-    user_id = 123456789
+    id_exist = False
+    user_id = 1234567890
     for entity in entitys:
         # берем ник пользователя
         if entity.type == "mention":
             mention_exists = True
             mention_user = entity.extract_from(message.text)[1:]
+            await state.update_data(username_mention=mention_user)
             # ищем его id
             async with TelegramClient('session_name', config.api_id.get_secret_value(),
                                       config.api_hash.get_secret_value()) as client:
                 try:
                     user = await client.get_entity(mention_user)
                     user_id = user.id
+
+                except UsernameInvalidError:
+                    await message.answer("Такого пользователя не существует! Попробуйте еще раз!")
                 except ValueError:
                     await message.answer("Не удается получить id пользователя!")
                     return
@@ -49,9 +55,7 @@ async def create_scammer2(message: types.Message, state: FSMContext):
     if not mention_exists and message.forward_from:
         forward_exist = True
         user_id = message.forward_from.id
-    if not mention_exists and not forward_exist:
-        await message.answer("Такого пользователя нет. Попробуйте еще раз!")
-    else:
+    if not (not mention_exists and not forward_exist):
         db.cursor.execute(
             f"SELECT tg_scammer_id, not_scammer FROM scammer WHERE tg_scammer_id = ?",
             (user_id,))
@@ -69,6 +73,31 @@ async def create_scammer2(message: types.Message, state: FSMContext):
             await message.answer("Скамер уже есть в базе данных!")
             await state.clear()
 
+    # проверка по id
+    match = re.search(r'\b\d{10}\b', message.text)
+    user_id = match.group() if match else None
+    if user_id:
+        id_exist = True
+        db.cursor.execute(
+            f"SELECT tg_scammer_id, not_scammer FROM scammer WHERE tg_scammer_id = ?",
+            (user_id,))
+        all_rows_with_number1 = True
+        scammer_exist = db.cursor.fetchall()
+        for row in scammer_exist:
+            if row[1] == 0:
+                all_rows_with_number1 = False
+        print(scammer_exist)
+        if not scammer_exist or all_rows_with_number1:
+            await state.update_data(scam_id=user_id)
+            await message.answer(f"Опишите ситуацию, в которой вы столкнулись со скамером, и в чем был обман")
+            await state.set_state(Scammer.scam_caption)
+        else:
+            await message.answer("Скамер уже есть в базе данных!")
+            await state.clear()
+
+    if not (mention_exists or forward_exist or id_exist):
+        await message.answer("Такого пользователя нет, либо аккаунт скрыт. Попробуйте еще раз!")
+
 
 @router.message(Scammer.scam_caption, F.text)
 async def create_scammer3(message: types.Message, state: FSMContext):
@@ -77,15 +106,13 @@ async def create_scammer3(message: types.Message, state: FSMContext):
     await state.set_state(Scammer.scam_photo)
 
 
-
-
-
 @router.message(Scammer.scam_photo, F.media_group_id, F.content_type == ContentType.PHOTO)
 @media_group_handler
 async def album_handler(messages: List[types.Message], state: FSMContext):
     data = await state.get_data()
     scam_id = data["scam_id"]
     scam_caption = data["scam_caption"]
+    mention = data["username_mention"] or "None"
 
     full_message = f"""Запрос на добавление скамера.\nid скамера: {scam_id}.\nОписание скама: {scam_caption}"""
 
@@ -93,11 +120,13 @@ async def album_handler(messages: List[types.Message], state: FSMContext):
     count_photos = 0
 
     for m in messages:
+
         username = m.from_user.username or "None"
+        print(username)
         db.cursor.execute("""INSERT INTO temp_storage(tg_scammer_id, tg_scammer_nick, scam_caption, photo_scam, tg_victim_id, tg_victim_nick)
                                         VALUES(?,?,?,?,?,?)""",
                           (
-                              data["scam_id"], "None", data["scam_caption"], m.photo[-1].file_id, m.from_user.id,
+                              data["scam_id"], mention, data["scam_caption"], m.photo[-1].file_id, m.from_user.id,
                               username))
         db.db.commit()
 
@@ -113,8 +142,15 @@ async def album_handler(messages: List[types.Message], state: FSMContext):
     await messages[-1].answer("Ваш запрос на добавление отправлен на проверку. Спасибо!",
                               reply_markup=keyboard.main_keyboard)
     await bot.send_media_group(chat_id=private_channel_id, media=media_group)
-    await bot.send_message(private_channel_id, full_message, reply_markup=keyboard.admin_keyboard_to_add_delete)
-
+    chat_info = await bot.get_chat(scam_id)
+    if not chat_info.has_private_forwards:
+        keyboard.admin_keyboard_to_add_delete.row(
+            types.InlineKeyboardButton(
+                text="Посмотреть профиль",
+                url=f"tg://user?id={scam_id}")
+        )
+    await bot.send_message(private_channel_id, full_message,
+                           reply_markup=keyboard.admin_keyboard_to_add_delete.as_markup())
 
 
 @router.message(Scammer.scam_photo, F.photo)
@@ -122,14 +158,14 @@ async def photo_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
     scam_id = data["scam_id"]
     scam_caption = data["scam_caption"]
-
+    mention = data["username_mention"] or "None"
     full_message = f"""Запрос на добавление скамера.\nid скамера: {scam_id}.\nОписание скама: {scam_caption}"""
 
     username = message.from_user.username or "None"
     db.cursor.execute("""INSERT INTO temp_storage(tg_scammer_id, tg_scammer_nick, scam_caption, photo_scam, tg_victim_id, tg_victim_nick)
                                             VALUES(?,?,?,?,?,?)""",
                       (
-                          data["scam_id"], "None", data["scam_caption"], message.photo[-1].file_id,
+                          data["scam_id"], mention, data["scam_caption"], message.photo[-1].file_id,
                           message.from_user.id,
                           username))
     db.db.commit()
@@ -137,7 +173,15 @@ async def photo_handler(message: types.Message, state: FSMContext):
     await message.answer("Ваш запрос на добавление отправлен на проверку. Спасибо!",
                          reply_markup=keyboard.main_keyboard)
     await bot.send_photo(chat_id=private_channel_id, photo=message.photo[-1].file_id)
-    await bot.send_message(private_channel_id, full_message, reply_markup=keyboard.admin_keyboard_to_add_delete)
+    chat_info = await bot.get_chat(scam_id)
+    if not chat_info.has_private_forwards:
+        keyboard.admin_keyboard_to_add_delete.row(
+            types.InlineKeyboardButton(
+                text="Посмотреть профиль",
+                url=f"tg://user?id={scam_id}"),
+        )
+    await bot.send_message(private_channel_id, full_message,
+                           reply_markup=keyboard.admin_keyboard_to_add_delete.as_markup())
 
 
 # -------------------------------------------------------------------------------------------------
@@ -145,7 +189,16 @@ async def photo_handler(message: types.Message, state: FSMContext):
 # -------------------------------------------------------------------------------------------------
 
 
-@router.callback_query(F.data == "write_to_reporter")
+@router.callback_query(F.data == "write_to_reporter_andr")
+async def add_scammer(callback: types.CallbackQuery):
+    pattern = r"id скамера: (\d+)"
+    match = re.search(pattern, callback.message.text)
+    if match:
+        scam_id = match.group(1)
+        await bot.send_message(chat_id=int(scam_id), text="Здравствуйте! Пишет администратор бота AntiScam")
+
+
+@router.callback_query(F.data == "write_to_reporter_andr")
 async def add_scammer(callback: types.CallbackQuery):
     pattern = r"id скамера: (\d+)"
     match = re.search(pattern, callback.message.text)
@@ -172,8 +225,8 @@ async def add_scammer(callback: types.CallbackQuery):
         db.db.commit()
         count_photos = 0
         lines = callback.message.text.split('\n')
-        text_to_public_channel = f"❌Пользователь с id{scam_id} СКАМЕР❌\n{lines[1]}\n{lines[2]}"
-
+        username = scammers[-1][1]
+        text_to_public_channel = f"❌Пользователь с id{scam_id} и username {username} СКАМЕР❌\n{lines[1]}\n{lines[2]}"
 
         for row in scammers:
             media_group.append(
@@ -189,6 +242,7 @@ async def add_scammer(callback: types.CallbackQuery):
                               (
                                   row[0], row[1], row[2], row[3], row[4], row[5]))
             db.db.commit()
+        username = scammers[-1][1]
         await callback.message.answer(f"Пользователь с  id {scam_id} успешно добавлен в базу!")
         await bot.send_media_group(chat_id=public_channel_id, media=media_group)
     else:

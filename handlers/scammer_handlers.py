@@ -29,10 +29,10 @@ async def back_to_menu(callback: types.CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "add_scammer")
 async def back_to_menu(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await callback.message.answer(
-        f"Добавьте никнейм в формате {hunderline('@пользователь')} или перешлите сообщение от пользователя, чтобы добавить его в базу скамеров.")
-    await state.set_state(Scammer.scam_id)
+    id_to_display = await state.get_data()
+    await state.update_data(scam_id=id_to_display["id"])
+    await callback.message.answer(f"Опишите ситуацию, в которой вы столкнулись со скамером, и в чем был обман")
+    await state.set_state(Scammer.scam_caption)
 
 @router.callback_query(F.data == "confirm_scammer")
 async def back_to_menu(callback: types.CallbackQuery, state: FSMContext):

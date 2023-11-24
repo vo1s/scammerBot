@@ -1,3 +1,4 @@
+from aiogram import types
 from aiogram.filters.callback_data import CallbackData
 from aiogram.types import (
     ReplyKeyboardMarkup,
@@ -60,18 +61,26 @@ sub_channel = InlineKeyboardMarkup(
     ]
 )
 
-admin_keyboard_to_add_delete = InlineKeyboardMarkup(
+admin_keyboard_to_add_delete = InlineKeyboardBuilder()
+admin_keyboard_to_add_delete.row(
+    InlineKeyboardButton(text="Добавить в базу",callback_data="add_scammer_to_db"),
+    InlineKeyboardButton(text="Удалить из базы", callback_data="delete_scammer_from_db")
+)
+
+
+"""
     inline_keyboard=[
         [
             InlineKeyboardButton(text="Добавить в базу", callback_data="add_scammer_to_db"),
             InlineKeyboardButton(text="Удалить из базы", callback_data="delete_scammer_from_db")
         ],
         [
-            InlineKeyboardButton(text="Написать пользователю", callback_data="write_to_reporter")
+            InlineKeyboardButton(text="Посмотреть на Андроид", callback_data="write_to_reporter_andr"),
+            InlineKeyboardButton(text="Посмотреть на Айфон", callback_data="write_to_reporter_iph")
         ]
     ]
 )
-
+"""
 change_scammer_status = InlineKeyboardMarkup(
     inline_keyboard=[
         [

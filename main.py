@@ -6,8 +6,7 @@ from config import config
 from aiogram import Bot
 from aiogram import Dispatcher
 import db
-
-
+from middlewares.check_sub import CheckSubscription
 
 
 async def load_db():
@@ -20,7 +19,7 @@ dp = Dispatcher()
 
 async def main():
     # dp.message.middleware(AntiFloodMiddleware())
-
+    dp.message.middleware(CheckSubscription())
 
 
 
