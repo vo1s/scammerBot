@@ -124,3 +124,6 @@ async def check_scammer2(message: types.Message, state: FSMContext):
 
     if not (mention_exists or forward_exist or id_exist):
         await message.answer("Такого пользователя нет, либо аккаунт скрыт. Попробуйте еще раз!")
+
+
+
